@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regional Sales Dashboard | Data Portfolio</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1c2430; --muted:#5b6675; --accent:#2f6fed; --border:#dde1e7; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1b212a; --text:#e8ecf1; --muted:#9aa5b4; --accent:#6c9bff; --border:#2b3440; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); line-height:1.55; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:16px; }
+  .findings ul { margin: 6px 0 0; padding-left: 20px; }
+  .controls { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+  label { font-size:.85rem; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  select { font-size:1rem; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text); }
+  .chart-wrap { position:relative; height: 380px; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th, td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--border); }
+  th:first-child, td:first-child { text-align:left; }
+  .check { font-size:.85rem; color:var(--muted); margin-top:8px; }
+  .note { font-size:.85rem; color:var(--muted); }
+  footer { color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Regional Sales Dashboard</h1>
+  <p class="sub">Monthly sales by region, 2025 (£ thousands). <strong>Sample data for demonstration.</strong></p>
+
+  <section class="card findings" aria-labelledby="kf">
+    <h2 id="kf">Key Findings</h2>
+    <ul id="findings-list"></ul>
+  </section>
+
+  <section class="card">
+    <div class="controls">
+      <label>Region
+        <select id="region"></select>
+      </label>
+      <label>Chart type
+        <select id="type">
+          <option value="line">Monthly trend (line)</option>
+          <option value="bar">Monthly (bar)</option>
+          <option value="total">Annual total by region</option>
+        </select>
+      </label>
+    </div>
+    <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Sales chart"></canvas></div>
+    <p class="check" id="check"></p>
+  </section>
+
+  <section class="card">
+    <h2>Underlying data</h2>
+    <div style="overflow-x:auto"><table id="data-table"></table></div>
+  </section>
+
+  <section class="card" aria-labelledby="hib">
+    <h2 id="hib">How I Built This</h2>
+    <ol>
+      <li><strong>Data preparation:</strong> [Describe your own steps, e.g. extracted with SQL, cleaned in Excel/Python, aggregated to monthly region totals.]</li>
+      <li><strong>AI-assisted build:</strong> I gave an AI assistant the summary table and asked for a single-file HTML page using Chart.js via CDN, with a filter, tooltips and a findings box.</li>
+      <li><strong>Quality checks:</strong> I compared every total and label on this page against the source spreadsheet. The page also runs its own totals check (shown under the chart). Key Findings are calculated from the data by code, not typed in by hand.</li>
+      <li><strong>Deployment:</strong> Hosted free on GitHub Pages, with version history in the repository.</li>
+    </ol>
+    <p class="note">The figures above are illustrative sample data, not from any employer.</p>
+  </section>
+
+  <footer>Built with Chart.js. Hosted on GitHub Pages.</footer>
+</main>
+
+<script>
+// ---- Replace this block with your own aggregated data ----
+const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const data = {
+  "North": [42,45,48,51,55,58,54,52,57,61,66,74],
+  "South": [38,40,43,44,47,49,46,45,48,52,57,65],
+  "East":  [29,31,30,33,35,38,36,35,39,42,46,53],
+  "West":  [34,33,36,38,41,43,40,39,43,47,51,59]
+};
+// ----------------------------------------------------------
+
+const colours = { North:"#2f6fed", South:"#e8833a", East:"#2aa876", West:"#a259d9" };
+const sum = a => a.reduce((x,y)=>x+y,0);
+const regions = Object.keys(data);
+const fmt = n => "£" + n.toLocaleString("en-GB") + "k";
+
+// Dropdown
+const regionSel = document.getElementById("region");
+["All regions", ...regions].forEach(r => regionSel.add(new Option(r, r)));
+
+// Key findings (calculated from data)
+(function findings(){
+  const totals = regions.map(r => [r, sum(data[r])]).sort((a,b)=>b[1]-a[1]);
+  const grand = sum(totals.map(t=>t[1]));
+  const monthly = months.map((m,i)=>[m, sum(regions.map(r=>data[r][i]))]);
+  const best = monthly.reduce((a,b)=>b[1]>a[1]?b:a);
+  const worst = monthly.reduce((a,b)=>b[1]<a[1]?b:a);
+  const growth = regions.map(r => [r, (data[r][11]-data[r][0])/data[r][0]*100]).sort((a,b)=>b[1]-a[1]);
+  const items = [
+    `Total sales: <strong>${fmt(grand)}</strong> across ${regions.length} regions.`,
+    `<strong>${totals[0][0]}</strong> is the largest region at ${fmt(totals[0][1])} (${(totals[0][1]/grand*100).toFixed(1)}% of total).`,
+    `Peak month: <strong>${best[0]}</strong> (${fmt(best[1])}); lowest month: <strong>${worst[0]}</strong> (${fmt(worst[1])}).`,
+    `Fastest growth Jan to Dec: <strong>${growth[0][0]}</strong> (+${growth[0][1].toFixed(0)}%).`
+  ];
+  document.getElementById("findings-list").innerHTML = items.map(i=>`<li>${i}</li>`).join("");
+})();
+
+// Table
+(function table(){
+  let h = "<tr><th>Region</th>" + months.map(m=>`<th>${m}</th>`).join("") + "<th>Total</th></tr>";
+  regions.forEach(r => { h += `<tr><td>${r}</td>` + data[r].map(v=>`<td>${v}</td>`).join("") + `<td><strong>${sum(data[r])}</strong></td></tr>`; });
+  const colTot = months.map((_,i)=>sum(regions.map(r=>data[r][i])));
+  h += "<tr><td><strong>All</strong></td>" + colTot.map(v=>`<td><strong>${v}</strong></td>`).join("") + `<td><strong>${sum(colTot)}</strong></td></tr>`;
+  document.getElementById("data-table").innerHTML = h;
+})();
+
+// Chart
+let chart;
+function draw(){
+  const region = regionSel.value;
+  const type = document.getElementById("type").value;
+  const shown = region === "All regions" ? regions : [region];
+  let cfg;
+  if (type === "total") {
+    cfg = { type:"bar", data:{ labels:shown, datasets:[{ label:"Annual total (£k)", data:shown.map(r=>sum(data[r])), backgroundColor:shown.map(r=>colours[r]) }] } };
+  } else {
+    cfg = { type, data:{ labels:months, datasets: shown.map(r => ({ label:r, data:data[r], borderColor:colours[r], backgroundColor:colours[r], tension:.25 })) } };
+  }
+  cfg.options = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ tooltip:{ callbacks:{ label: c => `${c.dataset.label}: £${c.parsed.y}k` } } },
+    scales:{ y:{ beginAtZero:true, title:{ display:true, text:"£ thousands" } } }
+  };
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), cfg);
+
+  const chartTotal = sum(shown.map(r=>sum(data[r])));
+  document.getElementById("check").textContent = `Check: sum of plotted data = £${chartTotal.toLocaleString("en-GB")}k (compare with your source spreadsheet).`;
+}
+regionSel.addEventListener("change", draw);
+document.getElementById("type").addEventListener("change", draw);
+draw();
+</script>
+</body>
+</html>
